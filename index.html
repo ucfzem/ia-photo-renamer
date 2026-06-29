@@ -1,54 +1,378 @@
-<!DOCTYPE html>
-<html lang="fr">
+<!DOCTYPE html><html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#6366f1">
-<link rel="manifest" href="manifest.json">
 <title>IA Photo Renamer</title>
 <style>
-*{margin:0;padding:0}body{font-family:sans-serif;background:#0f0f1a;color:#fff;padding:16px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:sans-serif;background:#0f0f1a;color:#fff;padding:16px;min-height:100vh}
 h1{background:linear-gradient(45deg,#6366f1,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;font-size:2em;margin:20px 0}
-.zone{border:3px dashed #6366f1;border-radius:20px;padding:50px 20px;text-align:center;margin:16px 0;cursor:pointer}
-.zone:active{background:rgba(99,102,241,.1)}
-.btn{background:linear-gradient(45deg,#6366f1,#a855f7);color:#fff;border:none;padding:18px;border-radius:50px;font-size:1.1em;width:100%;margin:10px 0;font-weight:bold}
-.btn:disabled{opacity:.5}
+.subtitle{text-align:center;color:#888;font-size:.85em;margin-bottom:20px}
+
+
+/* Clé API */
+#key-section{background:#1a1a2e;border:1px solid #6366f133;border-radius:16px;padding:16px;margin-bottom:16px}
+#key-section label{display:block;font-size:.8em;color:#a855f7;margin-bottom:6px;font-weight:bold}
+#key-row{display:flex;gap:8px}
+#apikey{flex:1;background:#0f0f1a;border:1px solid #6366f1;border-radius:10px;padding:12px;color:#fff;font-size:.9em;outline:none}
+#apikey::placeholder{color:#555}
+#save-key{background:linear-gradient(45deg,#6366f1,#a855f7);border:none;color:#fff;padding:12px 16px;border-radius:10px;font-size:.85em;font-weight:bold;white-space:nowrap}
+.key-status{font-size:.75em;margin-top:6px;color:#555}
+.key-status.ok{color:#22c55e}
+
+
+/* Zone drop */
+.zone{border:2px dashed #6366f1;border-radius:20px;padding:40px 20px;text-align:center;margin:16px 0;cursor:pointer;transition:background .2s}
+.zone:active,.zone.drag{background:rgba(99,102,241,.1)}
+.zone-icon{font-size:3em;margin-bottom:8px}
+.zone p{color:#aaa;font-size:.9em}
+
+
+/* Grille */
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:16px 0}
-.card{background:#1a1a2e;border-radius:12px;overflow:hidden}
+.card{background:#1a1a2e;border-radius:12px;overflow:hidden;border:1px solid #ffffff08}
 .card img{width:100%;height:100px;object-fit:cover}
 .info{padding:8px;font-size:.7em}
-.old{color:#ef4444;text-decoration:line-through}.new{color:#22c55e;font-weight:bold}
-.loading{display:none;text-align:center;padding:20px}
-.spinner{border:3px solid #1a1a2e;border-top:3px solid #6366f1;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}
+.old{color:#ef4444;text-decoration:line-through;word-break:break-all}
+.new{color:#22c55e;font-weight:bold;word-break:break-all;min-height:1em}
+.pending{color:#6366f1;font-style:italic}
+
+
+/* Boutons */
+.btn{background:linear-gradient(45deg,#6366f1,#a855f7);color:#fff;border:none;padding:16px;border-radius:50px;font-size:1em;width:100%;margin:6px 0;font-weight:bold;cursor:pointer;transition:opacity .2s}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-outline{background:transparent;border:1px solid #6366f1;color:#6366f1;border-radius:50px;padding:12px;font-size:.9em;width:100%;margin:6px 0;cursor:pointer}
+
+
+/* Progress */
+#progress-wrap{display:none;margin:12px 0}
+#progress-bar-bg{background:#1a1a2e;border-radius:50px;height:8px;overflow:hidden}
+#progress-bar{background:linear-gradient(45deg,#6366f1,#a855f7);height:100%;width:0%;transition:width .4s;border-radius:50px}
+#progress-text{text-align:center;font-size:.8em;color:#aaa;margin-top:6px}
+
+
+/* Spinner */
+.loading{display:none;text-align:center;padding:10px}
+.spinner{border:3px solid #1a1a2e;border-top:3px solid #6366f1;border-radius:50%;width:32px;height:32px;animation:spin 1s linear infinite;margin:10px auto}
 @keyframes spin{to{transform:rotate(360deg)}}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#22c55e;padding:12px 24px;border-radius:50px;display:none;font-weight:bold}
+
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:50px;display:none;font-weight:bold;font-size:.9em;z-index:999;text-align:center;max-width:90vw}
+.toast.success{background:#22c55e;color:#000}
+.toast.error{background:#ef4444;color:#fff}
 </style>
 </head>
 <body>
+
+
 <h1>🪄 IA Photo Renamer</h1>
-<div class="zone" onclick="document.getElementById('f').click()">
-<div style="font-size:3em">📸</div><p>Appuyez pour sélectionner</p>
-<input type="file" id="f" multiple accept="image/*" style="display:none" onchange="add(this.files)">
+<p class="subtitle">Renomme tes photos avec l'IA — gratuit via OpenRouter</p>
+
+
+<!-- Clé API -->
+<div id="key-section">
+  <label>🔑 Clé OpenRouter API</label>
+  <div id="key-row">
+    <input type="password" id="apikey" placeholder="sk-or-v1-..." autocomplete="off">
+    <button id="save-key" onclick="saveKey()">Sauver</button>
+  </div>
+  <div class="key-status" id="key-status">Aucune clé enregistrée</div>
 </div>
-<div class="grid" id="g"></div>
-<button class="btn" id="btn" disabled onclick="analyze()">🤖 Analyser avec l'IA</button>
-<div class="loading" id="load"><div class="spinner"></div><p id="lt">Analyse IA...</p></div>
+
+
+<!-- Zone sélection -->
+<div class="zone" id="zone" onclick="document.getElementById('f').click()">
+  <div class="zone-icon">📸</div>
+  <p>Appuyer pour sélectionner des photos</p>
+  <input type="file" id="f" multiple accept="image/*" style="display:none" onchange="addFiles(this.files)">
+</div>
+
+
+<div class="grid" id="grid"></div>
+
+
+<!-- Boutons -->
+<button class="btn" id="btn-analyze" disabled onclick="analyze()">🤖 Analyser &amp; Renommer</button>
+<button class="btn-outline" id="btn-clear" style="display:none" onclick="clearAll()">🗑 Tout effacer</button>
+
+
+<!-- Progress -->
+<div id="progress-wrap">
+  <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+  <div id="progress-text">0 / 0</div>
+</div>
+<div class="loading" id="loading"><div class="spinner"></div></div>
+
+
 <div class="toast" id="toast"></div>
-<script type="module">
-import{pipeline}from'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
-import JSZip from'https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm';
-window.imgs=[];window.model=null;
-window.add=function(f){window.imgs=[...window.imgs,...f].filter(x=>x.type.startsWith('image/'));document.getElementById('g').innerHTML=window.imgs.map((x,i)=>'<div class="card"><img src="'+URL.createObjectURL(x)+'"><div class="info"><div class="old">'+x.name+'</div><div class="new" id="n'+i+'"></div></div></div>').join('');document.getElementById('btn').disabled=!window.imgs.length};
-window.analyze=async function(){
-try{
-if(!window.model){document.getElementById('load').style.display='block';document.getElementById('lt').textContent='Chargement IA...';window.model=await pipeline('image-classification','Xenova/vit-base-patch16-224',{quantized:true})}
-document.getElementById('load').style.display='block';document.getElementById('lt').textContent='Analyse...';
-const zip=new JSZip();
-for(let i=0;i<window.imgs.length;i++){let f=window.imgs[i];let url=URL.createObjectURL(f);let res=await window.model(url);URL.revokeObjectURL(url);let label=res[0].label.replace(/[,\s]+/g,'_').toLowerCase();let ext=f.name.split('.').pop();document.getElementById('n'+i).textContent='→ '+label+'.'+ext;let buf=await f.arrayBuffer();zip.file(label+'.'+ext,buf)}
-const blob=await zip.generateAsync({type:'blob'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='photos_renommees.zip';document.body.appendChild(a);a.click();document.body.removeChild(a);
-document.getElementById('load').style.display='none';let t=document.getElementById('toast');t.textContent='✅ Terminé !';t.style.display='block';setTimeout(()=>t.style.display='none',3000)
-}catch(e){document.getElementById('load').style.display='none';document.getElementById('toast').textContent='❌ Erreur: '+e.message;document.getElementById('toast').style.display='block';document.getElementById('toast').style.background='#ef4444';setTimeout(()=>{document.getElementById('toast').style.display='none';document.getElementById('toast').style.background='#22c55e'},10000)}
-};
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ── État ──────────────────────────────────────────────────
+let imgs = [];
+let results = [];
+
+
+// ── Clé API ───────────────────────────────────────────────
+function saveKey() {
+  const val = document.getElementById('apikey').value.trim();
+  if (!val.startsWith('sk-or')) { toast('Clé invalide (doit commencer par sk-or-)', 'error'); return; }
+  localStorage.setItem('or_key', val);
+  showKeyStatus();
+  toast('Clé sauvegardée ✓', 'success');
+}
+function getKey() { return localStorage.getItem('or_key') || ''; }
+function showKeyStatus() {
+  const k = getKey();
+  const el = document.getElementById('key-status');
+  if (k) {
+    el.textContent = '✓ Clé enregistrée : ' + k.slice(0,12) + '...';
+    el.className = 'key-status ok';
+    document.getElementById('apikey').value = k;
+  } else {
+    el.textContent = 'Aucune clé enregistrée';
+    el.className = 'key-status';
+  }
+}
+showKeyStatus();
+
+
+// ── Fichiers ───────────────────────────────────────────────
+function addFiles(files) {
+  const newFiles = [...files].filter(f => f.type.startsWith('image/'));
+  imgs = [...imgs, ...newFiles];
+  results = imgs.map(f => ({ file: f, newName: null }));
+  renderGrid();
+  document.getElementById('btn-analyze').disabled = imgs.length === 0;
+  document.getElementById('btn-clear').style.display = imgs.length ? 'block' : 'none';
+}
+
+
+function renderGrid() {
+  document.getElementById('grid').innerHTML = results.map((r, i) => `
+    <div class="card">
+      <img src="${URL.createObjectURL(r.file)}" loading="lazy">
+      <div class="info">
+        <div class="old">${r.file.name}</div>
+        <div class="new" id="n${i}">${r.newName ? '→ ' + r.newName : '<span class="pending">en attente…</span>'}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+
+function clearAll() {
+  imgs = []; results = [];
+  document.getElementById('grid').innerHTML = '';
+  document.getElementById('btn-analyze').disabled = true;
+  document.getElementById('btn-clear').style.display = 'none';
+  document.getElementById('f').value = '';
+  setProgress(0, 0);
+  document.getElementById('progress-wrap').style.display = 'none';
+}
+
+
+// ── Analyse ────────────────────────────────────────────────
+async function analyze() {
+  const key = getKey();
+  if (!key) { toast('Entre ta clé OpenRouter d\'abord', 'error'); return; }
+  if (!imgs.length) return;
+
+
+  document.getElementById('btn-analyze').disabled = true;
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('loading').style.display = 'block';
+
+
+  const zip = new JSZip();
+  let done = 0;
+
+
+  for (let i = 0; i < imgs.length; i++) {
+    const f = imgs[i];
+    try {
+      document.getElementById('progress-text').textContent = `Analyse ${i + 1} / ${imgs.length} — ${f.name}`;
+
+
+      const b64 = await toBase64(f);
+      const mime = f.type;
+
+
+      const name = await callVision(key, b64, mime);
+      const ext = f.name.split('.').pop().toLowerCase();
+      const finalName = sanitize(name) + '.' + ext;
+
+
+      results[i].newName = finalName;
+      document.getElementById('n' + i).textContent = '→ ' + finalName;
+      document.getElementById('n' + i).className = 'new';
+
+
+      const buf = await f.arrayBuffer();
+      zip.file(finalName, buf);
+
+
+    } catch (e) {
+      results[i].newName = 'erreur_' + i + '.' + f.name.split('.').pop();
+      document.getElementById('n' + i).textContent = '❌ ' + (e.message || 'erreur');
+      document.getElementById('n' + i).style.color = '#ef4444';
+    }
+
+
+    done++;
+    setProgress(done, imgs.length);
+  }
+
+
+  document.getElementById('loading').style.display = 'none';
+
+
+  try {
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'photos_renommees.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast('✅ ZIP téléchargé !', 'success');
+  } catch (e) {
+    toast('Erreur ZIP : ' + e.message, 'error');
+  }
+
+
+  document.getElementById('btn-analyze').disabled = false;
+}
+
+
+// ── OpenRouter Vision ──────────────────────────────────────
+async function callVision(key, b64, mime) {
+  const prompt = `Look at this image and reply with ONLY a short filename in English, lowercase, no spaces (use underscores), no extension, max 5 words. Examples: sunset_over_mountains, cat_sleeping_on_sofa, street_food_vendor_night. Reply with ONLY the filename, nothing else.`;
+
+
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + key,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://ucfzem.github.io',
+      'X-Title': 'IA Photo Renamer'
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.0-flash-exp:free',
+      max_tokens: 30,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } },
+          { type: 'text', text: prompt }
+        ]
+      }]
+    })
+  });
+
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 429 || res.status === 402) {
+      return callVisionFallback(key, b64, mime);
+    }
+    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+  }
+
+
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content?.trim() || '';
+  if (!text) throw new Error('Réponse vide');
+  return text;
+}
+
+
+async function callVisionFallback(key, b64, mime) {
+  const prompt = `Look at this image. Reply with ONLY a short filename: lowercase, underscores, no extension, max 5 words. Example: dog_in_park. Just the filename.`;
+
+
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + key,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://ucfzem.github.io',
+      'X-Title': 'IA Photo Renamer'
+    },
+    body: JSON.stringify({
+      model: 'meta-llama/llama-3.2-11b-vision-instruct:free',
+      max_tokens: 30,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } },
+          { type: 'text', text: prompt }
+        ]
+      }]
+    })
+  });
+
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+  }
+
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content?.trim() || 'unnamed_photo';
+}
+
+
+// ── Utilitaires ────────────────────────────────────────────
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result.split(',')[1]);
+    r.onerror = () => reject(new Error('Lecture fichier échouée'));
+    r.readAsDataURL(file);
+  });
+}
+
+
+function sanitize(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 60) || 'photo';
+}
+
+
+function setProgress(done, total) {
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-text').textContent = total ? `${done} / ${total}` : '';
+}
+
+
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.display = 'none', 4000);
+}
+
+
+const zone = document.getElementById('zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); addFiles(e.dataTransfer.files); });
 </script>
-</body></html>
+</body>
+</html>
