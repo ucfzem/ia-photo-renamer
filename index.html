@@ -40,10 +40,12 @@ import{pipeline}from'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
 window.imgs=[];window.model=null;
 window.add=function(f){window.imgs=[...window.imgs,...f].filter(x=>x.type.startsWith('image/'));document.getElementById('g').innerHTML=window.imgs.map((x,i)=>'<div class="card"><img src="'+URL.createObjectURL(x)+'"><div class="info"><div class="old">'+x.name+'</div><div class="new" id="n'+i+'"></div></div></div>').join('');document.getElementById('btn').disabled=!window.imgs.length};
 window.analyze=async function(){
+try{
 if(!window.model){document.getElementById('load').style.display='block';document.getElementById('lt').textContent='Chargement IA...';window.model=await pipeline('image-classification','Xenova/vit-base-patch16-224',{quantized:true})}
 document.getElementById('load').style.display='block';document.getElementById('lt').textContent='Analyse...';
-for(let i=0;i<window.imgs.length;i++){let f=window.imgs[i];let d=await new Promise(r=>{let rd=new FileReader();rd.onload=e=>r(e.target.result);rd.readAsDataURL(f)});let res=await window.model(d);let label=res[0].label.replace(/[, ]+/g,'_').toLowerCase();let ext=f.name.split('.').pop();document.getElementById('n'+i).textContent='→ '+label+'.'+ext;let a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=label+'.'+ext;a.click();await new Promise(r=>setTimeout(r,300))}
+for(let i=0;i<window.imgs.length;i++){let f=window.imgs[i];let url=URL.createObjectURL(f);let res=await window.model(url);URL.revokeObjectURL(url);let label=res[0].label.replace(/[, ]+/g,'_').toLowerCase();let ext=f.name.split('.').pop();document.getElementById('n'+i).textContent='→ '+label+'.'+ext;let a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=label+'.'+ext;a.click();await new Promise(r=>setTimeout(r,300))}
 document.getElementById('load').style.display='none';let t=document.getElementById('toast');t.textContent='✅ Terminé !';t.style.display='block';setTimeout(()=>t.style.display='none',3000)
+}catch(e){document.getElementById('load').style.display='none';document.getElementById('toast').textContent='❌ Erreur: '+e.message;document.getElementById('toast').style.display='block';document.getElementById('toast').style.background='#ef4444';setTimeout(()=>{document.getElementById('toast').style.display='none';document.getElementById('toast').style.background='#22c55e'},10000)}
 };
 </script>
 </body></html>
